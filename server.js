@@ -52,11 +52,11 @@ const swaggerOptions = {
       contact: {
         name: 'Mikey',
       },
-      servers: [
+    },
+    servers: [
         { url: 'http://localhost:3000' },
         { url: 'https://api-user-delta.vercel.app' }
       ],
-    },
   },
   apis: ['server.js'], // Path to the API docs
 };
