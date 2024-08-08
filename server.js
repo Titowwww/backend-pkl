@@ -78,6 +78,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs, {
 // Middleware to validate required fields for research
 const validateResearchForm = (req, res, next) => {
   const requiredFields = [
+    'letterNumber',
     'name', 
     'researcherName', 
     'address', 
@@ -160,6 +161,7 @@ const uploadFileToFirebase = async (file) => {
  *     Penelitian:
  *       type: object
  *       required:
+ *         - letterNumber
  *         - name
  *         - researcherName
  *         - address
@@ -175,6 +177,8 @@ const uploadFileToFirebase = async (file) => {
  *         - researchPeriod
  *         - researchLocation
  *       properties:
+ *         letterNumber:
+ *           type: string
  *         name:
  *           type: string
  *         researcherName:
@@ -218,6 +222,8 @@ const uploadFileToFirebase = async (file) => {
  *           schema:
  *             type: object
  *             properties:
+ *               letterNumber:
+ *                 type: string
  *               name:
  *                 type: string
  *               researcherName:
@@ -246,13 +252,13 @@ const uploadFileToFirebase = async (file) => {
  *                 type: string
  *               researchLocation:
  *                 type: string
- *               suratPermohonan:
+ *               suratPengantarFile:
  *                 type: string
  *                 format: binary
- *               proposal:
+ *               proposalFile:
  *                 type: string
  *                 format: binary
- *               fotocopy:
+ *               ktpFile:
  *                 type: string
  *                 format: binary
  *     responses:
@@ -350,13 +356,13 @@ const uploadFileToFirebase = async (file) => {
  *                 type: string
  *               location:
  *                 type: string
- *               suratPermohonan:
+ *               suratPermohonanFile:
  *                 type: string
  *                 format: binary
- *               proposal:
+ *               proposalFile:
  *                 type: string
  *                 format: binary
- *               fotocopy:
+ *               ktpFile:
  *                 type: string
  *                 format: binary
  *     responses:
@@ -369,11 +375,12 @@ const uploadFileToFirebase = async (file) => {
 // Endpoint to handle research form submission
 
 app.post('/api/penelitian', upload.fields([
-  { name: 'suratPermohonan', maxCount: 1 },
-  { name: 'proposal', maxCount: 1 },
-  { name: 'fotocopy', maxCount: 1 },
+  { name: 'suratPengantarFile', maxCount: 1 },
+  { name: 'proposalFile', maxCount: 1 },
+  { name: 'ktpFile', maxCount: 1 },
 ]), validateResearchForm, async (req, res) => {
   const {
+    letterNumber,
     name,
     researcherName,
     address,
@@ -396,12 +403,13 @@ app.post('/api/penelitian', upload.fields([
     console.log("Request Files:", req.files);
 
     // Upload files to Firebase Storage
-    const suratPermohonanUrl = req.files?.suratPermohonan?.[0] ? await uploadFileToFirebase(req.files.suratPermohonan[0]) : null;
-    const proposalUrl = req.files?.proposal?.[0] ? await uploadFileToFirebase(req.files.proposal[0]) : null;
-    const fotocopyKTPUrl = req.files?.fotocopy?.[0] ? await uploadFileToFirebase(req.files.fotocopy[0]) : null;
+    const suratPengantarUrl = req.files?.suratPengantarFile?.[0] ? await uploadFileToFirebase(req.files.suratPengantarFile[0]) : null;
+    const proposalUrl = req.files?.proposalFile?.[0] ? await uploadFileToFirebase(req.files.proposalFile[0]) : null;
+    const ktpUrl = req.files?.ktpFile?.[0] ? await uploadFileToFirebase(req.files.ktpFile[0]) : null;
 
     // Save data to Firestore
     await db.collection('pelayanan').doc('penelitian').collection('data').add({
+      letterNumber,
       name,
       researcherName,
       address,
@@ -416,9 +424,9 @@ app.post('/api/penelitian', upload.fields([
       statusPenelitian,
       researchPeriod,
       researchLocation,
-      suratPermohonanUrl,
+      suratPengantarUrl,
       proposalUrl,
-      fotocopyKTPUrl,
+      ktpUrl,
       timestamp: admin.firestore.FieldValue.serverTimestamp()
     });
 
@@ -431,9 +439,9 @@ app.post('/api/penelitian', upload.fields([
 
 // Endpoint to handle internship form submission
 app.post('/api/magang', upload.fields([
-  { name: 'suratPermohonan', maxCount: 1 },
-  { name: 'proposal', maxCount: 1 },
-  { name: 'fotocopy', maxCount: 1 },
+  { name: 'suratPermohonanFile', maxCount: 1 },
+  { name: 'proposalFile', maxCount: 1 },
+  { name: 'ktpFile', maxCount: 1 },
 ]), validateInternshipForm, async (req, res) => {
   const {
     letterNumber,
@@ -457,9 +465,9 @@ app.post('/api/magang', upload.fields([
     console.log("Request Files:", req.files);
 
     // Upload files to Firebase Storage
-    const suratPermohonanUrl = req.files?.suratPermohonan?.[0] ? await uploadFileToFirebase(req.files.suratPermohonan[0]) : null;
-    const proposalUrl = req.files?.proposal?.[0] ? await uploadFileToFirebase(req.files.proposal[0]) : null;
-    const fotocopyKTPUrl = req.files?.fotocopy?.[0] ? await uploadFileToFirebase(req.files.fotocopy[0]) : null;
+    const suratPermohonanUrl = req.files?.suratPermohonanFile?.[0] ? await uploadFileToFirebase(req.files.suratPermohonanFile[0]) : null;
+    const proposalUrl = req.files?.proposalFile?.[0] ? await uploadFileToFirebase(req.files.proposalFile[0]) : null;
+    const ktpUrl = req.files?.ktpFile?.[0] ? await uploadFileToFirebase(req.files.ktpFile[0]) : null;
 
     // Save data to Firestore
     await db.collection('pelayanan').doc('magang').collection('magang').add({
@@ -478,7 +486,7 @@ app.post('/api/magang', upload.fields([
       location,
       suratPermohonanUrl,
       proposalUrl,
-      fotocopyKTPUrl,
+      ktpUrl,
       timestamp: admin.firestore.FieldValue.serverTimestamp()
     });
 
