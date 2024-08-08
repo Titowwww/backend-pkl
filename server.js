@@ -39,8 +39,8 @@ const upload = multer({
   },
 });
 
-// Middleware to validate required fields
-const validateForm = (req, res, next) => {
+// Middleware to validate required fields for research
+const validateResearchForm = (req, res, next) => {
   const requiredFields = [
     'name', 
     'researcherName', 
@@ -51,7 +51,38 @@ const validateForm = (req, res, next) => {
     'judulPenelitian', 
     'researchField', 
     'tujuanPenelitian', 
-    'supervisorName'
+    'supervisorName',
+    'teamMembers',
+    'statusPenelitian',
+    'researchPeriod',
+    'researchLocation'
+  ];
+
+  for (const field of requiredFields) {
+    if (!req.body[field]) {
+      return res.status(400).json({ message: `${field} is required` });
+    }
+  }
+
+  next();
+};
+
+// Middleware to validate required fields for internship
+const validateInternshipForm = (req, res, next) => {
+  const requiredFields = [
+    'letterNumber',
+    'name',
+    'address',
+    'inputValue',
+    'institution',
+    'occupation',
+    'judul',
+    'supervisorName',
+    'tujuanPermohonan',
+    'teamMembers',
+    'statusPermohonan',
+    'period',
+    'location'
   ];
 
   for (const field of requiredFields) {
@@ -86,12 +117,12 @@ const uploadFileToFirebase = async (file) => {
   });
 };
 
-// Endpoint to handle form submission
-app.post('/api/submit-form', upload.fields([
+// Endpoint to handle research form submission
+app.post('/api/penelitian', upload.fields([
   { name: 'suratPermohonan', maxCount: 1 },
   { name: 'proposal', maxCount: 1 },
   { name: 'fotocopy', maxCount: 1 },
-]), validateForm, async (req, res) => {
+]), validateResearchForm, async (req, res) => {
   const {
     name,
     researcherName,
@@ -135,6 +166,66 @@ app.post('/api/submit-form', upload.fields([
       statusPenelitian,
       researchPeriod,
       researchLocation,
+      suratPermohonanUrl,
+      proposalUrl,
+      fotocopyKTPUrl,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    res.json({ message: 'Data berhasil disimpan' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Terjadi kesalahan saat menyimpan data' });
+  }
+});
+
+// Endpoint to handle internship form submission
+app.post('/api/magang', upload.fields([
+  { name: 'suratPermohonan', maxCount: 1 },
+  { name: 'proposal', maxCount: 1 },
+  { name: 'fotocopy', maxCount: 1 },
+]), validateInternshipForm, async (req, res) => {
+  const {
+    letterNumber,
+    name,
+    address,
+    inputValue,
+    institution,
+    occupation,
+    judul,
+    supervisorName,
+    tujuanPermohonan,
+    teamMembers,
+    statusPermohonan,
+    period,
+    location
+  } = req.body;
+
+  try {
+    // Log data received in the request
+    console.log("Request Body:", req.body);
+    console.log("Request Files:", req.files);
+
+    // Upload files to Firebase Storage
+    const suratPermohonanUrl = req.files?.suratPermohonan?.[0] ? await uploadFileToFirebase(req.files.suratPermohonan[0]) : null;
+    const proposalUrl = req.files?.proposal?.[0] ? await uploadFileToFirebase(req.files.proposal[0]) : null;
+    const fotocopyKTPUrl = req.files?.fotocopy?.[0] ? await uploadFileToFirebase(req.files.fotocopy[0]) : null;
+
+    // Save data to Firestore
+    await db.collection('pelayanan').doc('magang').collection('magang').add({
+      letterNumber,
+      name,
+      address,
+      inputValue,
+      institution,
+      occupation,
+      judul,
+      supervisorName,
+      tujuanPermohonan,
+      teamMembers,
+      statusPermohonan,
+      period,
+      location,
       suratPermohonanUrl,
       proposalUrl,
       fotocopyKTPUrl,
