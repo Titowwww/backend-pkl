@@ -79,7 +79,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs, {
 const validateResearchForm = (req, res, next) => {
   const requiredFields = [
     'letterNumber',
-    'name', 
+    'applicantsName', 
     'researcherName', 
     'address', 
     'inputValue', 
@@ -108,7 +108,7 @@ const validateResearchForm = (req, res, next) => {
 const validateInternshipForm = (req, res, next) => {
   const requiredFields = [
     'letterNumber',
-    'name',
+    'applicantsName',
     'address',
     'inputValue',
     'institution',
@@ -162,7 +162,7 @@ const uploadFileToFirebase = async (file) => {
  *       type: object
  *       required:
  *         - letterNumber
- *         - name
+ *         - applicantsName
  *         - researcherName
  *         - address
  *         - inputValue
@@ -179,7 +179,7 @@ const uploadFileToFirebase = async (file) => {
  *       properties:
  *         letterNumber:
  *           type: string
- *         name:
+ *         applicantsName:
  *           type: string
  *         researcherName:
  *           type: string
@@ -224,7 +224,7 @@ const uploadFileToFirebase = async (file) => {
  *             properties:
  *               letterNumber:
  *                 type: string
- *               name:
+ *               applicantsName:
  *                 type: string
  *               researcherName:
  *                 type: string
@@ -276,7 +276,7 @@ const uploadFileToFirebase = async (file) => {
  *       type: object
  *       required:
  *         - letterNumber
- *         - name
+ *         - applicantsName
  *         - address
  *         - inputValue
  *         - institution
@@ -291,7 +291,7 @@ const uploadFileToFirebase = async (file) => {
  *       properties:
  *         letterNumber:
  *           type: string
- *         name:
+ *         applicantsName:
  *           type: string
  *         address:
  *           type: string
@@ -332,7 +332,7 @@ const uploadFileToFirebase = async (file) => {
  *             properties:
  *               letterNumber:
  *                 type: string
- *               name:
+ *               applicantsName:
  *                 type: string
  *               address:
  *                 type: string
@@ -381,7 +381,7 @@ app.post('/api/penelitian', upload.fields([
 ]), validateResearchForm, async (req, res) => {
   const {
     letterNumber,
-    name,
+    applicantsName,
     researcherName,
     address,
     inputValue,
@@ -410,7 +410,7 @@ app.post('/api/penelitian', upload.fields([
     // Save data to Firestore
     await db.collection('pelayanan').doc('penelitian').collection('data').add({
       letterNumber,
-      name,
+      applicantsName,
       researcherName,
       address,
       inputValue,
@@ -445,7 +445,7 @@ app.post('/api/magang', upload.fields([
 ]), validateInternshipForm, async (req, res) => {
   const {
     letterNumber,
-    name,
+    applicantsName,
     address,
     inputValue,
     institution,
@@ -472,7 +472,7 @@ app.post('/api/magang', upload.fields([
     // Save data to Firestore
     await db.collection('pelayanan').doc('magang').collection('magang').add({
       letterNumber,
-      name,
+      applicantsName,
       address,
       inputValue,
       institution,
