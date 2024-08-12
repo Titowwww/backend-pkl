@@ -79,7 +79,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs, {
 const validateResearchForm = (req, res, next) => {
   const requiredFields = [
     'letterNumber',
-    'applicantsName', 
+    'name', 
     'researcherName', 
     'address', 
     'inputValue', 
@@ -162,7 +162,7 @@ const uploadFileToFirebase = async (file) => {
  *       type: object
  *       required:
  *         - letterNumber
- *         - applicantsName
+ *         - name
  *         - researcherName
  *         - address
  *         - inputValue
@@ -179,7 +179,7 @@ const uploadFileToFirebase = async (file) => {
  *       properties:
  *         letterNumber:
  *           type: string
- *         applicantsName:
+ *         name:
  *           type: string
  *         researcherName:
  *           type: string
@@ -224,7 +224,7 @@ const uploadFileToFirebase = async (file) => {
  *             properties:
  *               letterNumber:
  *                 type: string
- *               applicantsName:
+ *               name:
  *                 type: string
  *               researcherName:
  *                 type: string
@@ -381,7 +381,7 @@ app.post('/api/penelitian', upload.fields([
 ]), validateResearchForm, async (req, res) => {
   const {
     letterNumber,
-    applicantsName,
+    name,
     researcherName,
     address,
     inputValue,
@@ -410,7 +410,7 @@ app.post('/api/penelitian', upload.fields([
     // Save data to Firestore
     await db.collection('pelayanan').doc('penelitian').collection('data').add({
       letterNumber,
-      applicantsName,
+      name,
       researcherName,
       address,
       inputValue,
