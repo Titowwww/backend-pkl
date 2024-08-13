@@ -4,6 +4,8 @@ const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const swaggerJsDoc = require('swagger-jsdoc');
+const swaggerUi = require('swagger-ui-express');
 
 require('dotenv').config();
 
@@ -31,17 +33,87 @@ admin.initializeApp({
 const db = admin.firestore();
 const bucket = admin.storage().bucket();
 
-// Setup Multer for file uploads
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 10 * 1024 * 1024, // Max file size 10MB
+// Helper function to upload files to Firebase
+const uploadFileToFirebase = async (buffer, filename, mimetype) => {
+  const blob = bucket.file(`${uuidv4()}_${filename}`);
+  const blobStream = blob.createWriteStream({
+    metadata: {
+      contentType: mimetype,
+    },
+  });
+
+  return new Promise((resolve, reject) => {
+    blobStream.on('error', (err) => {
+      reject(err);
+    });
+
+    blobStream.on('finish', async () => {
+      const publicUrl = `https://storage.googleapis.com/${bucket.name}/${blob.name}`;
+      resolve(publicUrl);
+    });
+
+    blobStream.end(buffer);
+  });
+};
+
+// Middleware to handle base64 file uploads
+const handleBase64Files = (req, res, next) => {
+  const base64Fields = ['suratPengantarFile', 'proposalFile', 'ktpFile'];
+
+  base64Fields.forEach(field => {
+    if (req.body[field]) {
+      const base64Data = req.body[field];
+      const matches = base64Data.match(/^data:(.+);base64,(.+)$/);
+      if (matches) {
+        const mimetype = matches[1];
+        const base64File = matches[2];
+        req.body[`${field}Buffer`] = Buffer.from(base64File, 'base64');
+        req.body[`${field}Mimetype`] = mimetype;
+        req.body[`${field}Name`] = `file_${uuidv4()}`; // Generate a unique filename or use an existing filename
+      }
+    }
+  });
+  next();
+};
+
+// Swagger Configuration
+const swaggerOptions = {
+  swaggerDefinition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'API Documentation',
+      description: 'API Information',
+      version: '1.0.0',
+      contact: {
+        name: 'Mikey',
+      },
+    },
+    servers: [
+      { url: 'http://localhost:3000' },
+      { url: 'https://api-user-delta.vercel.app' }
+    ],
   },
-});
+  apis: ['server.js'], // Path to the API docs
+};
+
+const swaggerDocs = swaggerJsDoc(swaggerOptions);
+
+// Use the latest Swagger UI bundle from a CDN
+const customCssUrl = 'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui.min.css';
+const customJs = [
+  'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui-bundle.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui-standalone-preset.js',
+];
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs, {
+  customCssUrl,
+  customJs,
+}));
 
 // Middleware to validate required fields for research
 const validateResearchForm = (req, res, next) => {
   const requiredFields = [
+    'letterNumber',
     'name', 
     'researcherName', 
     'address', 
@@ -71,7 +143,7 @@ const validateResearchForm = (req, res, next) => {
 const validateInternshipForm = (req, res, next) => {
   const requiredFields = [
     'letterNumber',
-    'name',
+    'applicantsName',
     'address',
     'inputValue',
     'institution',
@@ -94,36 +166,230 @@ const validateInternshipForm = (req, res, next) => {
   next();
 };
 
-// Helper function to upload files to Firebase
-const uploadFileToFirebase = async (file) => {
-  const blob = bucket.file(`${uuidv4()}_${file.originalname}`);
-  const blobStream = blob.createWriteStream({
-    metadata: {
-      contentType: file.mimetype,
-    },
-  });
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     Penelitian:
+ *       type: object
+ *       required:
+ *         - letterNumber
+ *         - name
+ *         - researcherName
+ *         - address
+ *         - inputValue
+ *         - institution
+ *         - occupation
+ *         - judulPenelitian
+ *         - researchField
+ *         - tujuanPenelitian
+ *         - supervisorName
+ *         - teamMembers
+ *         - statusPenelitian
+ *         - researchPeriod
+ *         - researchLocation
+ *       properties:
+ *         letterNumber:
+ *           type: string
+ *         name:
+ *           type: string
+ *         researcherName:
+ *           type: string
+ *         address:
+ *           type: string
+ *         inputValue:
+ *           type: string
+ *         institution:
+ *           type: string
+ *         occupation:
+ *           type: string
+ *         judulPenelitian:
+ *           type: string
+ *         researchField:
+ *           type: string
+ *         tujuanPenelitian:
+ *           type: string
+ *         supervisorName:
+ *           type: string
+ *         teamMembers:
+ *           type: string
+ *         statusPenelitian:
+ *           type: string
+ *         researchPeriod:
+ *           type: string
+ *         researchLocation:
+ *           type: string
+ */
 
-  return new Promise((resolve, reject) => {
-    blobStream.on('error', (err) => {
-      reject(err);
-    });
+/**
+ * @swagger
+ * /api/penelitian:
+ *   post:
+ *     summary: Submit a research form
+ *     tags: [Penelitian]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               letterNumber:
+ *                 type: string
+ *               name:
+ *                 type: string
+ *               researcherName:
+ *                 type: string
+ *               address:
+ *                 type: string
+ *               inputValue:
+ *                 type: string
+ *               institution:
+ *                 type: string
+ *               occupation:
+ *                 type: string
+ *               judulPenelitian:
+ *                 type: string
+ *               researchField:
+ *                 type: string
+ *               tujuanPenelitian:
+ *                 type: string
+ *               supervisorName:
+ *                 type: string
+ *               teamMembers:
+ *                 type: string
+ *               statusPenelitian:
+ *                 type: string
+ *               researchPeriod:
+ *                 type: string
+ *               researchLocation:
+ *                 type: string
+ *               suratPengantarFile:
+ *                 type: string
+ *                 format: binary
+ *               proposalFile:
+ *                 type: string
+ *                 format: binary
+ *               ktpFile:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Data berhasil disimpan
+ *       500:
+ *         description: Terjadi kesalahan saat menyimpan data
+ */
 
-    blobStream.on('finish', async () => {
-      const publicUrl = `https://storage.googleapis.com/${bucket.name}/${blob.name}`;
-      resolve(publicUrl);
-    });
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     Magang:
+ *       type: object
+ *       required:
+ *         - letterNumber
+ *         - applicantsName
+ *         - address
+ *         - inputValue
+ *         - institution
+ *         - occupation
+ *         - judul
+ *         - supervisorName
+ *         - tujuanPermohonan
+ *         - teamMembers
+ *         - statusPermohonan
+ *         - period
+ *         - location
+ *       properties:
+ *         letterNumber:
+ *           type: string
+ *         applicantsName:
+ *           type: string
+ *         address:
+ *           type: string
+ *         inputValue:
+ *           type: string
+ *         institution:
+ *           type: string
+ *         occupation:
+ *           type: string
+ *         judul:
+ *           type: string
+ *         supervisorName:
+ *           type: string
+ *         tujuanPermohonan:
+ *           type: string
+ *         teamMembers:
+ *           type: string
+ *         statusPermohonan:
+ *           type: string
+ *         period:
+ *           type: string
+ *         location:
+ *           type: string
+ */
 
-    blobStream.end(file.buffer);
-  });
-};
+/**
+ * @swagger
+ * /api/magang:
+ *   post:
+ *     summary: Submit an internship form
+ *     tags: [Magang]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               letterNumber:
+ *                 type: string
+ *               applicantsName:
+ *                 type: string
+ *               address:
+ *                 type: string
+ *               inputValue:
+ *                 type: string
+ *               institution:
+ *                 type: string
+ *               occupation:
+ *                 type: string
+ *               judul:
+ *                 type: string
+ *               supervisorName:
+ *                 type: string
+ *               tujuanPermohonan:
+ *                 type: string
+ *               teamMembers:
+ *                 type: string
+ *               statusPermohonan:
+ *                 type: string
+ *               period:
+ *                 type: string
+ *               location:
+ *                 type: string
+ *               suratPermohonanFile:
+ *                 type: string
+ *                 format: binary
+ *               proposalFile:
+ *                 type: string
+ *                 format: binary
+ *               ktpFile:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Data berhasil disimpan
+ *       500:
+ *         description: Terjadi kesalahan saat menyimpan data
+ */
 
 // Endpoint to handle research form submission
-app.post('/api/penelitian', upload.fields([
-  { name: 'suratPermohonan', maxCount: 1 },
-  { name: 'proposal', maxCount: 1 },
-  { name: 'fotocopy', maxCount: 1 },
-]), validateResearchForm, async (req, res) => {
+
+// Endpoint to handle research form submission
+app.post('/api/penelitian', handleBase64Files, validateResearchForm, async (req, res) => {
   const {
+    letterNumber,
     name,
     researcherName,
     address,
@@ -137,21 +403,30 @@ app.post('/api/penelitian', upload.fields([
     teamMembers,
     statusPenelitian,
     researchPeriod,
-    researchLocation
+    researchLocation,
+    suratPengantarFileBuffer,
+    suratPengantarFileName,
+    suratPengantarFileMimetype,
+    proposalFileBuffer,
+    proposalFileName,
+    proposalFileMimetype,
+    ktpFileBuffer,
+    ktpFileName,
+    ktpFileMimetype
   } = req.body;
 
   try {
     // Log data received in the request
     console.log("Request Body:", req.body);
-    console.log("Request Files:", req.files);
 
     // Upload files to Firebase Storage
-    const suratPermohonanUrl = req.files?.suratPermohonan?.[0] ? await uploadFileToFirebase(req.files.suratPermohonan[0]) : null;
-    const proposalUrl = req.files?.proposal?.[0] ? await uploadFileToFirebase(req.files.proposal[0]) : null;
-    const fotocopyKTPUrl = req.files?.fotocopy?.[0] ? await uploadFileToFirebase(req.files.fotocopy[0]) : null;
+    const suratPengantarUrl = suratPengantarFileBuffer ? await uploadFileToFirebase(suratPengantarFileBuffer, suratPengantarFileName, suratPengantarFileMimetype) : null;
+    const proposalUrl = proposalFileBuffer ? await uploadFileToFirebase(proposalFileBuffer, proposalFileName, proposalFileMimetype) : null;
+    const ktpUrl = ktpFileBuffer ? await uploadFileToFirebase(ktpFileBuffer, ktpFileName, ktpFileMimetype) : null;
 
     // Save data to Firestore
     await db.collection('pelayanan').doc('penelitian').collection('data').add({
+      letterNumber,
       name,
       researcherName,
       address,
@@ -166,9 +441,9 @@ app.post('/api/penelitian', upload.fields([
       statusPenelitian,
       researchPeriod,
       researchLocation,
-      suratPermohonanUrl,
+      suratPengantarUrl,
       proposalUrl,
-      fotocopyKTPUrl,
+      ktpUrl,
       timestamp: admin.firestore.FieldValue.serverTimestamp()
     });
 
@@ -180,14 +455,10 @@ app.post('/api/penelitian', upload.fields([
 });
 
 // Endpoint to handle internship form submission
-app.post('/api/magang', upload.fields([
-  { name: 'suratPermohonan', maxCount: 1 },
-  { name: 'proposal', maxCount: 1 },
-  { name: 'fotocopy', maxCount: 1 },
-]), validateInternshipForm, async (req, res) => {
+app.post('/api/magang', handleBase64Files, validateInternshipForm, async (req, res) => {
   const {
     letterNumber,
-    name,
+    applicantsName,
     address,
     inputValue,
     institution,
@@ -198,23 +469,31 @@ app.post('/api/magang', upload.fields([
     teamMembers,
     statusPermohonan,
     period,
-    location
+    location,
+    suratPermohonanFileBuffer,
+    suratPermohonanFileName,
+    suratPermohonanFileMimetype,
+    proposalFileBuffer,
+    proposalFileName,
+    proposalFileMimetype,
+    ktpFileBuffer,
+    ktpFileName,
+    ktpFileMimetype
   } = req.body;
 
   try {
     // Log data received in the request
     console.log("Request Body:", req.body);
-    console.log("Request Files:", req.files);
 
     // Upload files to Firebase Storage
-    const suratPermohonanUrl = req.files?.suratPermohonan?.[0] ? await uploadFileToFirebase(req.files.suratPermohonan[0]) : null;
-    const proposalUrl = req.files?.proposal?.[0] ? await uploadFileToFirebase(req.files.proposal[0]) : null;
-    const fotocopyKTPUrl = req.files?.fotocopy?.[0] ? await uploadFileToFirebase(req.files.fotocopy[0]) : null;
+    const suratPermohonanUrl = suratPermohonanFileBuffer ? await uploadFileToFirebase(suratPermohonanFileBuffer, suratPermohonanFileName, suratPermohonanFileMimetype) : null;
+    const proposalUrl = proposalFileBuffer ? await uploadFileToFirebase(proposalFileBuffer, proposalFileName, proposalFileMimetype) : null;
+    const ktpUrl = ktpFileBuffer ? await uploadFileToFirebase(ktpFileBuffer, ktpFileName, ktpFileMimetype) : null;
 
     // Save data to Firestore
     await db.collection('pelayanan').doc('magang').collection('magang').add({
       letterNumber,
-      name,
+      applicantsName,
       address,
       inputValue,
       institution,
@@ -228,7 +507,7 @@ app.post('/api/magang', upload.fields([
       location,
       suratPermohonanUrl,
       proposalUrl,
-      fotocopyKTPUrl,
+      ktpUrl,
       timestamp: admin.firestore.FieldValue.serverTimestamp()
     });
 
@@ -239,10 +518,7 @@ app.post('/api/magang', upload.fields([
   }
 });
 
-app.get('/', (req, res) => {
-  res.send('Hey this is my API running')
-});
-
+// Start server
 app.listen(port, () => {
-  console.log(`Server listening on port ${port}`);
+  console.log(`Server running on http://localhost:${port}`);
 });

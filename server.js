@@ -131,27 +131,54 @@ const validateInternshipForm = (req, res, next) => {
   next();
 };
 
+// Middleware untuk validasi file yang diunggah
+
+const validateFiles = (req, res, next) => {
+  const requiredFiles = ['suratPengantarFile', 'proposalFile', 'ktpFile'];
+  
+  for (const file of requiredFiles) {
+    if (!req.files[file] || req.files[file].length === 0) {
+      return res.status(400).json({ message: `File ${file} is required` });
+    }
+    
+    const allowedMimeTypes = ['application/pdf', 'image/jpeg', 'image/png']; // Sesuaikan dengan kebutuhan
+    const fileMimeType = req.files[file][0].mimetype;
+    
+    if (!allowedMimeTypes.includes(fileMimeType)) {
+      return res.status(400).json({ message: `File ${file} must be a PDF, JPEG, or PNG` });
+    }
+  }
+
+  next();
+};
+
 // Helper function to upload files to Firebase
 const uploadFileToFirebase = async (file) => {
-  const blob = bucket.file(`${uuidv4()}_${file.originalname}`);
-  const blobStream = blob.createWriteStream({
-    metadata: {
-      contentType: file.mimetype,
-    },
-  });
-
-  return new Promise((resolve, reject) => {
-    blobStream.on('error', (err) => {
-      reject(err);
+  try {
+    const blob = bucket.file(`${uuidv4()}_${file.originalname}`);
+    const blobStream = blob.createWriteStream({
+      metadata: {
+        contentType: file.mimetype,
+      },
     });
 
-    blobStream.on('finish', async () => {
-      const publicUrl = `https://storage.googleapis.com/${bucket.name}/${blob.name}`;
-      resolve(publicUrl);
-    });
+    return new Promise((resolve, reject) => {
+      blobStream.on('error', (err) => {
+        console.error('Blob stream error:', err);  // Log the error
+        reject(err);
+      });
 
-    blobStream.end(file.buffer);
-  });
+      blobStream.on('finish', async () => {
+        const publicUrl = `https://storage.googleapis.com/${bucket.name}/${blob.name}`;
+        resolve(publicUrl);
+      });
+
+      blobStream.end(file.buffer);
+    });
+  } catch (err) {
+    console.error('Error uploading file to Firebase:', err);  // Log the error
+    throw err;  // Rethrow the error to be caught by the calling function
+  }
 };
 
 /**
