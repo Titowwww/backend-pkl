@@ -54,9 +54,9 @@ const swaggerOptions = {
       },
     },
     servers: [
-        { url: 'http://localhost:3000' },
-        { url: 'https://api-user-delta.vercel.app' }
-      ],
+      { url: 'http://localhost:3000' },
+      { url: 'https://api-user-delta.vercel.app' }
+    ],
   },
   apis: ['server.js'], // Path to the API docs
 };
@@ -132,7 +132,6 @@ const validateInternshipForm = (req, res, next) => {
 };
 
 // Middleware untuk validasi file yang diunggah
-
 const validateFiles = (req, res, next) => {
   const requiredFiles = ['suratPengantarFile', 'proposalFile', 'ktpFile'];
   
@@ -164,20 +163,21 @@ const uploadFileToFirebase = async (file) => {
 
     return new Promise((resolve, reject) => {
       blobStream.on('error', (err) => {
-        console.error('Blob stream error:', err);  // Log the error
+        console.error('Blob stream error:', err);
         reject(err);
       });
 
       blobStream.on('finish', async () => {
-        const publicUrl = `https://storage.googleapis.com/${bucket.name}/${blob.name}`;
+        // Construct the desired URL manually
+        const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(blob.name)}?alt=media`;
         resolve(publicUrl);
       });
 
       blobStream.end(file.buffer);
     });
   } catch (err) {
-    console.error('Error uploading file to Firebase:', err);  // Log the error
-    throw err;  // Rethrow the error to be caught by the calling function
+    console.error('Error uploading file to Firebase:', err);
+    throw err;
   }
 };
 
@@ -400,12 +400,11 @@ const uploadFileToFirebase = async (file) => {
  */
 
 // Endpoint to handle research form submission
-
 app.post('/api/penelitian', upload.fields([
   { name: 'suratPengantarFile', maxCount: 1 },
   { name: 'proposalFile', maxCount: 1 },
   { name: 'ktpFile', maxCount: 1 },
-]), validateResearchForm, async (req, res) => {
+]), validateResearchForm, validateFiles, async (req, res) => {
   const {
     letterNumber,
     name,
@@ -425,14 +424,10 @@ app.post('/api/penelitian', upload.fields([
   } = req.body;
 
   try {
-    // Log data received in the request
-    console.log("Request Body:", req.body);
-    console.log("Request Files:", req.files);
-
     // Upload files to Firebase Storage
-    const suratPengantarUrl = req.files?.suratPengantarFile?.[0] ? await uploadFileToFirebase(req.files.suratPengantarFile[0]) : null;
-    const proposalUrl = req.files?.proposalFile?.[0] ? await uploadFileToFirebase(req.files.proposalFile[0]) : null;
-    const ktpUrl = req.files?.ktpFile?.[0] ? await uploadFileToFirebase(req.files.ktpFile[0]) : null;
+    const suratPengantarUrl = req.files.suratPengantarFile ? await uploadFileToFirebase(req.files.suratPengantarFile[0]) : null;
+    const proposalUrl = req.files.proposalFile ? await uploadFileToFirebase(req.files.proposalFile[0]) : null;
+    const ktpUrl = req.files.ktpFile ? await uploadFileToFirebase(req.files.ktpFile[0]) : null;
 
     // Save data to Firestore
     await db.collection('pelayanan').doc('penelitian').collection('data').add({
@@ -469,7 +464,7 @@ app.post('/api/magang', upload.fields([
   { name: 'suratPermohonanFile', maxCount: 1 },
   { name: 'proposalFile', maxCount: 1 },
   { name: 'ktpFile', maxCount: 1 },
-]), validateInternshipForm, async (req, res) => {
+]), validateInternshipForm, validateFiles, async (req, res) => {
   const {
     letterNumber,
     applicantsName,
@@ -487,14 +482,10 @@ app.post('/api/magang', upload.fields([
   } = req.body;
 
   try {
-    // Log data received in the request
-    console.log("Request Body:", req.body);
-    console.log("Request Files:", req.files);
-
     // Upload files to Firebase Storage
-    const suratPermohonanUrl = req.files?.suratPermohonanFile?.[0] ? await uploadFileToFirebase(req.files.suratPermohonanFile[0]) : null;
-    const proposalUrl = req.files?.proposalFile?.[0] ? await uploadFileToFirebase(req.files.proposalFile[0]) : null;
-    const ktpUrl = req.files?.ktpFile?.[0] ? await uploadFileToFirebase(req.files.ktpFile[0]) : null;
+    const suratPermohonanUrl = req.files.suratPermohonanFile ? await uploadFileToFirebase(req.files.suratPermohonanFile[0]) : null;
+    const proposalUrl = req.files.proposalFile ? await uploadFileToFirebase(req.files.proposalFile[0]) : null;
+    const ktpUrl = req.files.ktpFile ? await uploadFileToFirebase(req.files.ktpFile[0]) : null;
 
     // Save data to Firestore
     await db.collection('pelayanan').doc('magang').collection('magang').add({
