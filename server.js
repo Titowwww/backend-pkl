@@ -131,8 +131,8 @@ const validateInternshipForm = (req, res, next) => {
   next();
 };
 
-// Middleware untuk validasi file yang diunggah
-const validateFiles = (req, res, next) => {
+// Middleware untuk validasi file penelitian 
+const validateResearchFiles = (req, res, next) => {
   const requiredFiles = ['suratPengantarFile', 'proposalFile', 'ktpFile'];
   
   for (const file of requiredFiles) {
@@ -140,7 +140,7 @@ const validateFiles = (req, res, next) => {
       return res.status(400).json({ message: `File ${file} is required` });
     }
     
-    const allowedMimeTypes = ['application/pdf', 'image/jpeg', 'image/png']; // Sesuaikan dengan kebutuhan
+    const allowedMimeTypes = ['application/pdf', 'image/jpeg', 'image/png'];
     const fileMimeType = req.files[file][0].mimetype;
     
     if (!allowedMimeTypes.includes(fileMimeType)) {
@@ -150,6 +150,28 @@ const validateFiles = (req, res, next) => {
 
   next();
 };
+
+
+// Middleware untuk validasi file penelitian 
+const validateInternshipFiles = (req, res, next) => {
+  const requiredFiles = ['suratPermohonanFile', 'proposalFile', 'ktpFile'];
+  
+  for (const file of requiredFiles) {
+    if (!req.files[file] || req.files[file].length === 0) {
+      return res.status(400).json({ message: `File ${file} is required` });
+    }
+    
+    const allowedMimeTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+    const fileMimeType = req.files[file][0].mimetype;
+    
+    if (!allowedMimeTypes.includes(fileMimeType)) {
+      return res.status(400).json({ message: `File ${file} must be a PDF, JPEG, or PNG` });
+    }
+  }
+
+  next();
+};
+
 
 // Helper function to upload files to Firebase
 const uploadFileToFirebase = async (file) => {
@@ -404,7 +426,7 @@ app.post('/api/penelitian', upload.fields([
   { name: 'suratPengantarFile', maxCount: 1 },
   { name: 'proposalFile', maxCount: 1 },
   { name: 'ktpFile', maxCount: 1 },
-]), validateResearchForm, validateFiles, async (req, res) => {
+]), validateResearchForm, validateResearchFiles, async (req, res) => {
   const {
     letterNumber,
     name,
@@ -464,7 +486,7 @@ app.post('/api/magang', upload.fields([
   { name: 'suratPermohonanFile', maxCount: 1 },
   { name: 'proposalFile', maxCount: 1 },
   { name: 'ktpFile', maxCount: 1 },
-]), validateInternshipForm, validateFiles, async (req, res) => {
+]), validateInternshipForm, validateInternshipFiles, async (req, res) => {
   const {
     letterNumber,
     applicantsName,
