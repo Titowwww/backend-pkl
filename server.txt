@@ -33,48 +33,13 @@ admin.initializeApp({
 const db = admin.firestore();
 const bucket = admin.storage().bucket();
 
-// Helper function to upload files to Firebase
-const uploadFileToFirebase = async (buffer, filename, mimetype) => {
-  const blob = bucket.file(`${uuidv4()}_${filename}`);
-  const blobStream = blob.createWriteStream({
-    metadata: {
-      contentType: mimetype,
-    },
-  });
-
-  return new Promise((resolve, reject) => {
-    blobStream.on('error', (err) => {
-      reject(err);
-    });
-
-    blobStream.on('finish', async () => {
-      const publicUrl = `https://storage.googleapis.com/${bucket.name}/${blob.name}`;
-      resolve(publicUrl);
-    });
-
-    blobStream.end(buffer);
-  });
-};
-
-// Middleware to handle base64 file uploads
-const handleBase64Files = (req, res, next) => {
-  const base64Fields = ['suratPengantarFile', 'proposalFile', 'ktpFile'];
-
-  base64Fields.forEach(field => {
-    if (req.body[field]) {
-      const base64Data = req.body[field];
-      const matches = base64Data.match(/^data:(.+);base64,(.+)$/);
-      if (matches) {
-        const mimetype = matches[1];
-        const base64File = matches[2];
-        req.body[`${field}Buffer`] = Buffer.from(base64File, 'base64');
-        req.body[`${field}Mimetype`] = mimetype;
-        req.body[`${field}Name`] = `file_${uuidv4()}`; // Generate a unique filename or use an existing filename
-      }
-    }
-  });
-  next();
-};
+// Setup Multer for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // Max file size 10MB
+  },
+});
 
 // Swagger Configuration
 const swaggerOptions = {
@@ -89,9 +54,9 @@ const swaggerOptions = {
       },
     },
     servers: [
-      { url: 'http://localhost:3000' },
-      { url: 'https://api-user-delta.vercel.app' }
-    ],
+        { url: 'http://localhost:3000' },
+        { url: 'https://api-user-delta.vercel.app' }
+      ],
   },
   apis: ['server.js'], // Path to the API docs
 };
@@ -164,6 +129,56 @@ const validateInternshipForm = (req, res, next) => {
   }
 
   next();
+};
+
+// Middleware untuk validasi file yang diunggah
+
+const validateFiles = (req, res, next) => {
+  const requiredFiles = ['suratPengantarFile', 'proposalFile', 'ktpFile'];
+  
+  for (const file of requiredFiles) {
+    if (!req.files[file] || req.files[file].length === 0) {
+      return res.status(400).json({ message: `File ${file} is required` });
+    }
+    
+    const allowedMimeTypes = ['application/pdf', 'image/jpeg', 'image/png']; // Sesuaikan dengan kebutuhan
+    const fileMimeType = req.files[file][0].mimetype;
+    
+    if (!allowedMimeTypes.includes(fileMimeType)) {
+      return res.status(400).json({ message: `File ${file} must be a PDF, JPEG, or PNG` });
+    }
+  }
+
+  next();
+};
+
+// Helper function to upload files to Firebase
+const uploadFileToFirebase = async (file) => {
+  try {
+    const blob = bucket.file(`${uuidv4()}_${file.originalname}`);
+    const blobStream = blob.createWriteStream({
+      metadata: {
+        contentType: file.mimetype,
+      },
+    });
+
+    return new Promise((resolve, reject) => {
+      blobStream.on('error', (err) => {
+        console.error('Blob stream error:', err);  // Log the error
+        reject(err);
+      });
+
+      blobStream.on('finish', async () => {
+        const publicUrl = `https://storage.googleapis.com/${bucket.name}/${blob.name}`;
+        resolve(publicUrl);
+      });
+
+      blobStream.end(file.buffer);
+    });
+  } catch (err) {
+    console.error('Error uploading file to Firebase:', err);  // Log the error
+    throw err;  // Rethrow the error to be caught by the calling function
+  }
 };
 
 /**
@@ -386,8 +401,11 @@ const validateInternshipForm = (req, res, next) => {
 
 // Endpoint to handle research form submission
 
-// Endpoint to handle research form submission
-app.post('/api/penelitian', handleBase64Files, validateResearchForm, async (req, res) => {
+app.post('/api/penelitian', upload.fields([
+  { name: 'suratPengantarFile', maxCount: 1 },
+  { name: 'proposalFile', maxCount: 1 },
+  { name: 'ktpFile', maxCount: 1 },
+]), validateResearchForm, async (req, res) => {
   const {
     letterNumber,
     name,
@@ -403,26 +421,18 @@ app.post('/api/penelitian', handleBase64Files, validateResearchForm, async (req,
     teamMembers,
     statusPenelitian,
     researchPeriod,
-    researchLocation,
-    suratPengantarFileBuffer,
-    suratPengantarFileName,
-    suratPengantarFileMimetype,
-    proposalFileBuffer,
-    proposalFileName,
-    proposalFileMimetype,
-    ktpFileBuffer,
-    ktpFileName,
-    ktpFileMimetype
+    researchLocation
   } = req.body;
 
   try {
     // Log data received in the request
     console.log("Request Body:", req.body);
+    console.log("Request Files:", req.files);
 
     // Upload files to Firebase Storage
-    const suratPengantarUrl = suratPengantarFileBuffer ? await uploadFileToFirebase(suratPengantarFileBuffer, suratPengantarFileName, suratPengantarFileMimetype) : null;
-    const proposalUrl = proposalFileBuffer ? await uploadFileToFirebase(proposalFileBuffer, proposalFileName, proposalFileMimetype) : null;
-    const ktpUrl = ktpFileBuffer ? await uploadFileToFirebase(ktpFileBuffer, ktpFileName, ktpFileMimetype) : null;
+    const suratPengantarUrl = req.files?.suratPengantarFile?.[0] ? await uploadFileToFirebase(req.files.suratPengantarFile[0]) : null;
+    const proposalUrl = req.files?.proposalFile?.[0] ? await uploadFileToFirebase(req.files.proposalFile[0]) : null;
+    const ktpUrl = req.files?.ktpFile?.[0] ? await uploadFileToFirebase(req.files.ktpFile[0]) : null;
 
     // Save data to Firestore
     await db.collection('pelayanan').doc('penelitian').collection('data').add({
@@ -455,7 +465,11 @@ app.post('/api/penelitian', handleBase64Files, validateResearchForm, async (req,
 });
 
 // Endpoint to handle internship form submission
-app.post('/api/magang', handleBase64Files, validateInternshipForm, async (req, res) => {
+app.post('/api/magang', upload.fields([
+  { name: 'suratPermohonanFile', maxCount: 1 },
+  { name: 'proposalFile', maxCount: 1 },
+  { name: 'ktpFile', maxCount: 1 },
+]), validateInternshipForm, async (req, res) => {
   const {
     letterNumber,
     applicantsName,
@@ -469,26 +483,18 @@ app.post('/api/magang', handleBase64Files, validateInternshipForm, async (req, r
     teamMembers,
     statusPermohonan,
     period,
-    location,
-    suratPermohonanFileBuffer,
-    suratPermohonanFileName,
-    suratPermohonanFileMimetype,
-    proposalFileBuffer,
-    proposalFileName,
-    proposalFileMimetype,
-    ktpFileBuffer,
-    ktpFileName,
-    ktpFileMimetype
+    location
   } = req.body;
 
   try {
     // Log data received in the request
     console.log("Request Body:", req.body);
+    console.log("Request Files:", req.files);
 
     // Upload files to Firebase Storage
-    const suratPermohonanUrl = suratPermohonanFileBuffer ? await uploadFileToFirebase(suratPermohonanFileBuffer, suratPermohonanFileName, suratPermohonanFileMimetype) : null;
-    const proposalUrl = proposalFileBuffer ? await uploadFileToFirebase(proposalFileBuffer, proposalFileName, proposalFileMimetype) : null;
-    const ktpUrl = ktpFileBuffer ? await uploadFileToFirebase(ktpFileBuffer, ktpFileName, ktpFileMimetype) : null;
+    const suratPermohonanUrl = req.files?.suratPermohonanFile?.[0] ? await uploadFileToFirebase(req.files.suratPermohonanFile[0]) : null;
+    const proposalUrl = req.files?.proposalFile?.[0] ? await uploadFileToFirebase(req.files.proposalFile[0]) : null;
+    const ktpUrl = req.files?.ktpFile?.[0] ? await uploadFileToFirebase(req.files.ktpFile[0]) : null;
 
     // Save data to Firestore
     await db.collection('pelayanan').doc('magang').collection('magang').add({
@@ -518,7 +524,10 @@ app.post('/api/magang', handleBase64Files, validateInternshipForm, async (req, r
   }
 });
 
-// Start server
+app.get('/', (req, res) => {
+  res.send('Hey this is my API running')
+});
+
 app.listen(port, () => {
-  console.log(`Server running on http://localhost:${port}`);
+  console.log(`Server listening on port ${port}`);
 });
